@@ -1,0 +1,79 @@
+version: '3.9' 
+
+services:
+  nginx:
+    image: jonasal/nginx-certbot:5.2.1-nginx1.27.0
+    restart: unless-stopped 
+    ports:
+      - 80:80
+      - 443:443
+    env_file:
+      - ./nginx-certbot.env
+    configs:
+      - source: myapp_config
+        target: /etc/nginx/user_conf.d/myapp.conf
+    networks:
+      - app-network
+    volumes:
+      - nginx_secrets:/etc/letsencrypt
+
+  java-spring-boot-app:
+    build:
+      context: ./clash-stats-api/ 
+    container_name: my-java-service 
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./clash-stats-api/.env
+    restart: unless-stopped 
+    networks:
+      - app-network
+
+  python-fastapi-app:
+    build:
+      context: ./clash-stats-python-api/ 
+    container_name: my-python-service
+    ports:
+      - "8000:8000" 
+    env_file:
+      - ./clash-stats-python-api/.env
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  react-vite-app:
+    build:
+      context: ./clash-stats-frontend/ 
+    container_name: my-react-frontend
+    #ports:
+      #- "4173:4173"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  redis-cache:
+    image: redis:latest 
+    container_name: my-redis-cache
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+configs:
+  myapp_config:
+    file: ./myapp.conf
+
+volumes:
+  nginx_secrets:
+
+networks:
+  app-network:
+    driver: bridge 
+
